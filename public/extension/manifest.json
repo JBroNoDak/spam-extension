@@ -1,0 +1,34 @@
+{
+  "manifest_version": 3,
+  "name": "Gmail Phishing Guard - External Threat Scanner",
+  "version": "1.0.0",
+  "description": "Scans Gmail emails from external sources, detects phishing attempts, and highlights suspicious links and attachments with color-coded warnings.",
+  "permissions": [
+    "storage",
+    "activeTab"
+  ],
+  "host_permissions": [
+    "https://mail.google.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Gmail Phishing Guard"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://mail.google.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

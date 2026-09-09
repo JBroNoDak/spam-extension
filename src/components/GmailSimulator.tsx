@@ -23,6 +23,9 @@ import {
   FileQuestion,
   Lock,
   Flag,
+  Download,
+  X,
+  Check,
 } from 'lucide-react';
 import { EmailMessage, EmailScanReport, EmailLink, EmailAttachment, RiskLevel } from '../types';
 import { SecurityBanner } from './SecurityBanner';
@@ -47,6 +50,8 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
   const [isDeepScanning, setIsDeepScanning] = useState(false);
   const [reportsCache, setReportsCache] = useState<Record<string, EmailScanReport>>({});
   const [reportedEmails, setReportedEmails] = useState<Record<string, boolean>>({});
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [scanNotification, setScanNotification] = useState<string | null>(null);
 
   // Compute or retrieve scan report for current selected email
   const currentEmail = useMemo(() => {
@@ -70,17 +75,33 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
     return map;
   }, [emails, reportsCache]);
 
-  const handleDeepScan = async () => {
+  const handleTriggerScan = async (useAi: boolean = false, targetEmail?: EmailMessage) => {
+    const target = targetEmail || currentEmail;
     setIsDeepScanning(true);
+    setScanNotification(`Scanning "${target.subject.slice(0, 30)}..."`);
     try {
-      const updatedReport = await requestDeepAiScan(currentEmail);
+      let updatedReport: EmailScanReport;
+      if (useAi) {
+        updatedReport = await requestDeepAiScan(target);
+      } else {
+        // Quick artificial heuristic latency for realistic feedback
+        await new Promise((r) => setTimeout(r, 400));
+        updatedReport = scanEmailHeuristic(target);
+      }
       setReportsCache((prev) => ({
         ...prev,
-        [currentEmail.id]: updatedReport,
+        [target.id]: updatedReport,
       }));
+      setShowReportModal(true);
+      setScanNotification(`✓ Scan complete: ${updatedReport.overallRiskLevel.toUpperCase()} (Score: ${updatedReport.overallScore}/100)`);
+      setTimeout(() => setScanNotification(null), 4000);
     } finally {
       setIsDeepScanning(false);
     }
+  };
+
+  const handleDeepScan = async () => {
+    await handleTriggerScan(true);
   };
 
   const handleReportPhishing = () => {
@@ -235,21 +256,34 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
         {/* Quick Toolbar Actions */}
         <div className="flex items-center gap-2">
           <button
+            id="top-bar-scan-email-btn"
+            onClick={() => handleTriggerScan(false)}
+            disabled={isDeepScanning}
+            className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-sky-500/20 transition-all cursor-pointer disabled:opacity-50"
+            title="Scan this email for phishing, deceptive links, and attachments"
+          >
+            <Shield className="w-4 h-4" />
+            <span>{isDeepScanning ? 'Scanning...' : 'Scan Email with Guard'}</span>
+          </button>
+
+          <button
             id="open-custom-scanner-header-btn"
             onClick={onOpenCustomScanner}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
+            title="Test any custom email or link"
           >
             <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span className="hidden sm:inline">Custom Email Scanner</span>
+            <span className="hidden sm:inline">Testbench</span>
           </button>
 
           <button
             id="download-extension-header-btn"
             onClick={onOpenExtensionPackage}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-medium transition-colors shadow-sm cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer"
+            title="Download Chrome Extension package"
           >
-            <Shield className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Chrome Extension</span>
+            <Download className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Get Extension</span>
           </button>
         </div>
       </header>
@@ -365,7 +399,14 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
             <span>
               {activeFolder.toUpperCase()} ({filteredEmails.length})
             </span>
-            <span className="text-[11px] text-slate-400">Click email to inspect</span>
+            <button
+              onClick={() => handleTriggerScan(false)}
+              className="text-[11px] text-sky-400 hover:text-sky-300 font-semibold flex items-center gap-1 cursor-pointer"
+              title="Scan selected email immediately"
+            >
+              <Shield className="w-3 h-3" />
+              <span>Scan Current</span>
+            </button>
           </div>
 
           <div className="divide-y divide-slate-800/60">
@@ -405,29 +446,44 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
                     {email.snippet}
                   </p>
 
-                  {/* Warning Pill injected by extension */}
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${pillStyle}`}
+                  {/* Warning Pill & Quick Scan Action */}
+                  <div className="flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span
+                        className={`text-[10px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider ${pillStyle}`}
+                      >
+                        {rep?.overallRiskLevel === 'critical' && '🔴 Phishing'}
+                        {rep?.overallRiskLevel === 'warning' && '🟠 Suspicious'}
+                        {rep?.overallRiskLevel === 'caution' && '🟡 External'}
+                        {rep?.overallRiskLevel === 'safe' && '🟢 Safe'}
+                      </span>
+
+                      {email.isExternal && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                          Ext.
+                        </span>
+                      )}
+
+                      {email.attachments.length > 0 && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 flex items-center gap-1 border border-slate-700">
+                          <Paperclip className="w-2.5 h-2.5" />
+                          {email.attachments.length}
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEmailId(email.id);
+                        handleTriggerScan(false, email);
+                      }}
+                      className="text-[10px] font-semibold px-2 py-0.5 rounded bg-sky-950/80 hover:bg-sky-900 text-sky-300 border border-sky-600/40 transition-colors cursor-pointer flex items-center gap-1"
+                      title="Run Phishing Guard scan on this email"
                     >
-                      {rep?.overallRiskLevel === 'critical' && '🔴 Phishing'}
-                      {rep?.overallRiskLevel === 'warning' && '🟠 Suspicious'}
-                      {rep?.overallRiskLevel === 'caution' && '🟡 External'}
-                      {rep?.overallRiskLevel === 'safe' && '🟢 Safe'}
-                    </span>
-
-                    {email.isExternal && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
-                        Ext.
-                      </span>
-                    )}
-
-                    {email.attachments.length > 0 && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 flex items-center gap-1 border border-slate-700">
-                        <Paperclip className="w-2.5 h-2.5" />
-                        {email.attachments.length}
-                      </span>
-                    )}
+                      <Shield className="w-2.5 h-2.5" />
+                      <span>Scan</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -438,8 +494,8 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
         {/* Email Detail View with Injected Extension Overlays */}
         <div className="flex-1 bg-slate-900/10 flex flex-col overflow-y-auto">
           <div className="p-4 md:p-6 max-w-4xl mx-auto w-full space-y-4">
-            {/* Email Subject Header */}
-            <div className="flex items-start justify-between gap-4 pb-2">
+            {/* Email Subject Header & Scan Toolbar */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-2 border-b border-slate-800/80">
               <div>
                 <h1 className="text-lg md:text-xl font-bold text-white tracking-tight">
                   {currentEmail.subject}
@@ -463,6 +519,40 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* Dedicated Scan Buttons in Detail View Header */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  id="scan-email-action-btn"
+                  onClick={() => handleTriggerScan(false)}
+                  disabled={isDeepScanning}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs shadow-md shadow-sky-600/30 transition-all cursor-pointer disabled:opacity-50"
+                  title="Click to scan this email with Gmail Phishing Guard"
+                >
+                  <Shield className="w-4 h-4" />
+                  <span>{isDeepScanning ? 'Scanning...' : '🛡️ Scan Email'}</span>
+                </button>
+
+                <button
+                  id="ai-deep-scan-header-btn"
+                  onClick={() => handleTriggerScan(true)}
+                  disabled={isDeepScanning}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 font-semibold text-xs transition-colors cursor-pointer disabled:opacity-50"
+                  title="Run deep AI analysis on social engineering indicators"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                  <span className="hidden sm:inline">AI Deep Scan</span>
+                </button>
+
+                <button
+                  id="view-report-modal-btn"
+                  onClick={() => setShowReportModal(true)}
+                  className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 font-semibold text-xs transition-colors cursor-pointer"
+                  title="Open full Security Scan Report"
+                >
+                  Report
+                </button>
               </div>
             </div>
 
@@ -624,6 +714,198 @@ export const GmailSimulator: React.FC<GmailSimulatorProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Floating Persistent Scan Button (matches Chrome Extension floating badge) */}
+      <div className="fixed bottom-5 right-5 z-40">
+        <button
+          id="floating-scan-guard-btn"
+          onClick={() => handleTriggerScan(false)}
+          disabled={isDeepScanning}
+          className="flex items-center gap-2.5 px-4 py-2.5 rounded-full bg-slate-900 hover:bg-slate-800 text-white border-2 border-sky-400 shadow-2xl hover:scale-105 transition-all cursor-pointer group disabled:opacity-50"
+          title="Click to scan currently viewed email with Phishing Guard"
+        >
+          <span className="w-2.5 h-2.5 rounded-full bg-sky-400 animate-pulse" />
+          <Shield className="w-4 h-4 text-sky-400 group-hover:rotate-12 transition-transform" />
+          <span className="font-bold text-xs tracking-wide">
+            {isDeepScanning ? 'Scanning...' : 'Scan Email with Guard'}
+          </span>
+        </button>
+      </div>
+
+      {/* Toast Notification */}
+      {scanNotification && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-slate-900 border border-sky-500/50 text-sky-200 text-xs font-semibold px-4 py-2 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
+          <Shield className="w-4 h-4 text-sky-400" />
+          <span>{scanNotification}</span>
+        </div>
+      )}
+
+      {/* Security Scan Report Modal */}
+      {showReportModal && (
+        <div
+          className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto"
+          onClick={() => setShowReportModal(false)}
+        >
+          <div
+            className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto shadow-2xl p-5 space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+              <div className="flex items-center gap-2">
+                <Shield className="w-5 h-5 text-sky-400" />
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Security Scan Report
+                </h2>
+              </div>
+              <button
+                onClick={() => setShowReportModal(false)}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Verdict Card */}
+            <div
+              className={`p-4 rounded-xl border flex items-center justify-between ${
+                currentReport.overallRiskLevel === 'critical'
+                  ? 'bg-red-950/30 border-red-500/50 text-red-200'
+                  : currentReport.overallRiskLevel === 'warning'
+                  ? 'bg-amber-950/30 border-amber-500/50 text-amber-200'
+                  : currentReport.overallRiskLevel === 'caution'
+                  ? 'bg-yellow-950/30 border-yellow-500/50 text-yellow-200'
+                  : 'bg-emerald-950/30 border-emerald-500/50 text-emerald-200'
+              }`}
+            >
+              <div>
+                <div className="text-[10px] uppercase font-bold tracking-widest opacity-80">
+                  Phishing Guard Assessment
+                </div>
+                <div className="text-lg font-black tracking-tight mt-0.5">
+                  {currentReport.overallRiskLevel === 'critical' && '🔴 CRITICAL PHISHING THREAT'}
+                  {currentReport.overallRiskLevel === 'warning' && '🟠 SUSPICIOUS EMAIL'}
+                  {currentReport.overallRiskLevel === 'caution' && '🟡 EXTERNAL SENDER CAUTION'}
+                  {currentReport.overallRiskLevel === 'safe' && '🟢 VERIFIED SAFE'}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-[10px] opacity-80 uppercase font-semibold">Risk Score</div>
+                <div className="text-2xl font-black font-mono">
+                  {currentReport.overallScore}
+                  <span className="text-xs font-normal opacity-70">/100</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Sender & Auth Summary */}
+            <div className="p-3 bg-slate-950/70 rounded-xl border border-slate-800 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Sender:</span>
+                <span className="font-semibold text-slate-200">{currentEmail.sender.name} &lt;{currentEmail.sender.email}&gt;</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">Origin:</span>
+                <span className={currentEmail.isExternal ? 'text-amber-400 font-semibold' : 'text-emerald-400 font-semibold'}>
+                  {currentEmail.isExternal ? '⚠️ External Source' : '🏢 Internal Corporate'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-400">SPF / DKIM / DMARC:</span>
+                <span className="font-mono text-[11px] text-slate-300">
+                  {currentEmail.headers.spf.toUpperCase()} / {currentEmail.headers.dkim.toUpperCase()} / {currentEmail.headers.dmarc.toUpperCase()}
+                </span>
+              </div>
+            </div>
+
+            {/* Threat Indicators */}
+            {currentReport.reasons.length > 0 ? (
+              <div className="space-y-2">
+                <div className="text-xs font-bold text-red-300 uppercase tracking-wider">
+                  ⚠️ Flagged Threat Anomalies ({currentReport.reasons.length})
+                </div>
+                <ul className="space-y-1.5 bg-slate-950/60 p-3 rounded-xl border border-slate-800 text-xs text-slate-300">
+                  {currentReport.reasons.map((reason, idx) => (
+                    <li key={idx} className="flex items-start gap-2">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5" />
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span>No deceptive link targets, typosquatting domains, or dangerous attachments detected.</span>
+              </div>
+            )}
+
+            {/* Analyzed Links Quick Review */}
+            {currentReport.links.length > 0 && (
+              <div className="space-y-1.5">
+                <div className="text-xs font-bold text-slate-300">
+                  Links Evaluated ({currentReport.links.length}):
+                </div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {currentReport.links.map((link) => (
+                    <div
+                      key={link.id}
+                      className="p-2 rounded-lg bg-slate-950/60 border border-slate-800 text-[11px] flex items-center justify-between gap-2"
+                    >
+                      <div className="truncate">
+                        <span className="text-slate-400">Anchor: </span>
+                        <span className="font-mono text-slate-200">{link.anchorText}</span>
+                        <span className="text-slate-400 ml-2">Target: </span>
+                        <span className="font-mono text-sky-400">{link.targetDomain}</span>
+                      </div>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase ${
+                        link.riskLevel === 'critical' ? 'bg-red-600 text-white' :
+                        link.riskLevel === 'warning' ? 'bg-amber-600 text-white' :
+                        link.riskLevel === 'caution' ? 'bg-yellow-600 text-white' :
+                        'bg-emerald-600 text-white'
+                      }`}>
+                        {link.riskLevel}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-800">
+              <button
+                onClick={() => handleTriggerScan(true)}
+                disabled={isDeepScanning}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 text-indigo-200 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                <Sparkles className="w-3.5 h-3.5 text-indigo-300" />
+                <span>Rerun with AI Deep Scan</span>
+              </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    handleReportPhishing();
+                    setShowReportModal(false);
+                    setScanNotification('🚩 Reported to security team & quarantined');
+                    setTimeout(() => setScanNotification(null), 4000);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Quarantine & Report
+                </button>
+                <button
+                  onClick={() => setShowReportModal(false)}
+                  className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Interactive Link Inspector Modal */}
       <LinkInspectorModal

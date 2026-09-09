@@ -151,6 +151,39 @@ export const ExtensionPackageView: React.FC<ExtensionPackageViewProps> = ({ onBa
           </div>
         </div>
 
+        {/* Reload & Whitelist Instructions Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="bg-slate-900/90 rounded-2xl border border-sky-900/40 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-sky-400 uppercase tracking-wider">
+              <span>🔄 How to Reload Extension After Updates</span>
+            </div>
+            <ol className="text-xs text-slate-300 space-y-1.5 pl-4 list-decimal leading-relaxed">
+              <li>Open a new tab in Google Chrome and go to <code className="text-sky-300 bg-slate-950 px-1 py-0.5 rounded font-mono">chrome://extensions</code></li>
+              <li>Ensure <strong>Developer mode</strong> toggle (top right corner) is <strong>ON</strong>.</li>
+              <li>Locate <strong>Gmail Phishing Guard</strong> in your list of extensions.</li>
+              <li>Click the <strong>🔄 Reload (circular arrow icon)</strong> on the extension card.</li>
+              <li>Switch back to your <strong>Gmail tab</strong> and press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-700">Ctrl + R</kbd> (or <kbd className="bg-slate-800 px-1.5 py-0.5 rounded text-[11px] font-mono border border-slate-700">Cmd + R</kbd>) to refresh!</li>
+            </ol>
+          </div>
+
+          <div className="bg-slate-900/90 rounded-2xl border border-emerald-900/40 p-4 space-y-2">
+            <div className="flex items-center gap-2 text-xs font-bold text-emerald-400 uppercase tracking-wider">
+              <span>🏢 Stop Internal Emails From Being Flagged</span>
+            </div>
+            <div className="text-xs text-slate-300 space-y-1.5 leading-relaxed">
+              <p>
+                To designate your company domain (e.g. <code className="text-emerald-300 bg-slate-950 px-1 py-0.5 rounded font-mono">rks.io</code>) as internal:
+              </p>
+              <ol className="pl-4 list-decimal space-y-1 text-slate-400">
+                <li>Click the <strong>🛡️ Gmail Phishing Guard icon</strong> in your Chrome extensions bar.</li>
+                <li>In <strong>Trusted & Internal Domains</strong>, type your domain (e.g., <span className="text-white font-mono">rks.io</span>) and click <strong>+ Add</strong>.</li>
+                <li>Click <strong>🔄 Apply Whitelist & Rescan Gmail</strong>.</li>
+                <li>Emails from colleagues will now display a green <strong className="text-emerald-400">🏢 INTERNAL</strong> verified badge with zero false-alarm external warnings.</li>
+              </ol>
+            </div>
+          </div>
+        </div>
+
         {/* Source Code Explorer */}
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
           {/* File Selector Sidebar */}

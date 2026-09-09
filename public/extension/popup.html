@@ -218,13 +218,39 @@
   </div>
 
   <div class="card">
-    <div class="card-title">Add Whitelist Domain</div>
-    <div class="input-group">
-      <input type="text" id="whitelistInput" placeholder="e.g. partner-corp.com">
-      <button id="addWhitelistBtn">Add</button>
+    <div class="card-title">Trusted & Internal Domains (Whitelist)</div>
+    <div style="font-size: 10px; color: #94a3b8; margin-bottom: 6px; line-height: 1.4;">
+      Emails & links matching these domains will be treated as <strong>Internal / Verified Safe</strong> and will NOT be flagged as external.
     </div>
-    <div id="whitelistTags" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px;">
-      <span style="background:#334155; padding: 2px 6px; border-radius: 4px; font-size: 10px;">company.com</span>
+    <div class="input-group">
+      <input type="text" id="whitelistInput" placeholder="e.g. rks.io or partner.com">
+      <button id="addWhitelistBtn">+ Add</button>
+    </div>
+    <div id="whitelistTags" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">
+      <!-- Populated dynamically -->
+    </div>
+    <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+      <button id="rescanGmailBtn" style="background: #0284c7; width: 100%; padding: 8px; font-weight: 700; border-radius: 6px;">
+        🔄 Apply Whitelist & Rescan Gmail
+      </button>
+    </div>
+    <div id="rescanFeedback" style="font-size: 10px; color: #34d399; margin-top: 4px; text-align: center; display: none;">
+      ✓ Updated! Rescanning open Gmail tabs...
+    </div>
+  </div>
+
+  <div class="card" style="background: #1e293b; border-color: #3b82f640;">
+    <div class="card-title" style="color: #60a5fa; display: flex; align-items: center; justify-content: space-between;">
+      <span>How to Reload Extension</span>
+      <span style="font-size: 10px; text-transform: none; color: #94a3b8;">After code updates</span>
+    </div>
+    <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5;">
+      <ol style="margin: 0; padding-left: 16px;">
+        <li>Open Chrome tab: <code style="background: #0f172a; padding: 1px 4px; border-radius: 3px; color: #38bdf8;">chrome://extensions</code></li>
+        <li>Enable <strong>Developer mode</strong> (toggle in top-right)</li>
+        <li>Click <strong>🔄 Reload</strong> on <em>Gmail Phishing Guard</em></li>
+        <li>Switch to Gmail and press <strong>Ctrl+R</strong> (or <strong>Cmd+R</strong>)</li>
+      </ol>
     </div>
   </div>
 

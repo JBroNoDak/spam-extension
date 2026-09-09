@@ -2,5 +2,7 @@
   "name": "Gmail Phishing Guard Chrome Extension",
   "description": "Chrome extension for Gmail that scans external emails, identifies phishing threats, and highlights suspicious links and attachments with color-coded warnings.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }

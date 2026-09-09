@@ -17,7 +17,32 @@ const SUSPICIOUS_EXTENSIONS = [
   '.html', '.htm', '.svg'
 ];
 
-export function analyzeLink(urlStr: string, textStr: string = ''): EmailLink {
+export function cleanDomain(input: string): string {
+  if (!input) return '';
+  let str = String(input).trim().toLowerCase();
+  str = str.replace(/^mailto:/, '');
+  str = str.replace(/^https?:\/\//, '');
+  if (str.includes('@')) {
+    str = str.split('@').pop() || '';
+  }
+  str = str.split('/')[0].split(':')[0].split('?')[0];
+  str = str.replace(/^www\./, '').replace(/^@+/, '').replace(/^\.+/, '');
+  return str;
+}
+
+export function isDomainWhitelisted(domainOrEmail: string, whitelist: string[] = []): boolean {
+  const target = cleanDomain(domainOrEmail);
+  if (!target) return false;
+  const list = whitelist.map(cleanDomain).filter(Boolean);
+  for (const d of list) {
+    if (target === d || target.endsWith('.' + d)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+export function analyzeLink(urlStr: string, textStr: string = '', whitelist: string[] = []): EmailLink {
   const issues: string[] = [];
   let riskLevel: RiskLevel = 'safe';
   let score = 0;
@@ -25,7 +50,19 @@ export function analyzeLink(urlStr: string, textStr: string = ''): EmailLink {
   try {
     const parsed = new URL(urlStr.trim());
     const hostname = parsed.hostname.toLowerCase();
+    const cleanHost = cleanDomain(hostname);
     const protocol = parsed.protocol.toLowerCase();
+
+    // Whitelist check
+    if (isDomainWhitelisted(cleanHost, whitelist)) {
+      return {
+        url: urlStr,
+        text: textStr || urlStr,
+        issues: [],
+        riskLevel: 'safe',
+        score: 0,
+      };
+    }
 
     // 1. Unencrypted HTTP
     if (protocol === 'http:') {
@@ -65,7 +102,6 @@ export function analyzeLink(urlStr: string, textStr: string = ''): EmailLink {
     }
 
     // 5. Lookalike brand imitation
-    const cleanHost = hostname.replace(/^www\./, '');
     for (const brand of POPULAR_BRANDS) {
       const brandBase = brand.split('.')[0];
       if (cleanHost !== brand) {
@@ -195,7 +231,17 @@ export function analyzeAttachment(att: EmailAttachment): EmailAttachment {
   };
 }
 
-export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
+export function scanEmailHeuristic(
+  email: EmailMessage,
+  whitelist: string[] = [],
+  internalDomains: string[] = []
+): EmailScanReport {
+  const combinedTrusted = [...whitelist, ...internalDomains, 'acmecorp.com'];
+  const senderDomain = cleanDomain(email.sender.domain || email.sender.email || '');
+  const senderEmail = cleanDomain(email.sender.email || '');
+  const isTrustedSender = isDomainWhitelisted(senderDomain, combinedTrusted) || isDomainWhitelisted(senderEmail, combinedTrusted);
+  const effectiveIsExternal = isTrustedSender ? false : email.isExternal;
+
   // Extract links from HTML and bodyText
   const extractedLinks: EmailLink[] = [];
   const hrefRegex = /href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
@@ -204,7 +250,7 @@ export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
     const url = match[1];
     const text = match[2].replace(/<[^>]+>/g, '').trim();
     if (!url.startsWith('mailto:') && !url.startsWith('#')) {
-      extractedLinks.push(analyzeLink(url, text));
+      extractedLinks.push(analyzeLink(url, text, combinedTrusted));
     }
   }
 
@@ -213,7 +259,7 @@ export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
     const rawUrlRegex = /(https?:\/\/[^\s<>"']+)/gi;
     let urlMatch;
     while ((urlMatch = rawUrlRegex.exec(email.bodyText)) !== null) {
-      extractedLinks.push(analyzeLink(urlMatch[1], urlMatch[1]));
+      extractedLinks.push(analyzeLink(urlMatch[1], urlMatch[1], combinedTrusted));
     }
   }
 
@@ -222,17 +268,18 @@ export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
   let score = 0;
   const heuristicSignals: string[] = [];
 
-  if (email.isExternal) {
+  if (effectiveIsExternal) {
     heuristicSignals.push('Email originates from an external organization');
     score += 10;
+  } else if (isTrustedSender) {
+    heuristicSignals.push(`Sender domain verified as trusted/internal organization (${senderDomain || 'organization'})`);
   }
 
   // Check display name impersonation
   const senderName = email.sender.name || '';
-  const senderDomain = email.sender.domain || '';
   for (const brand of POPULAR_BRANDS) {
     const brandName = brand.split('.')[0];
-    if (new RegExp(`\\b${brandName}\\b`, 'i').test(senderName) && !senderDomain.includes(brandName)) {
+    if (new RegExp(`\\b${brandName}\\b`, 'i').test(senderName) && !senderDomain.includes(brandName) && !isTrustedSender) {
       heuristicSignals.push(`Sender display name "${senderName}" claims association with ${brandName}, but uses external domain "${senderDomain}"`);
       score += 50;
     }
@@ -270,7 +317,7 @@ export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
     overallRiskLevel = 'critical';
   } else if (overallScore >= 45 || maxLinkScore >= 45 || maxAttScore >= 45) {
     overallRiskLevel = 'warning';
-  } else if (overallScore >= 20 || email.isExternal) {
+  } else if (overallScore >= 20 || effectiveIsExternal) {
     overallRiskLevel = 'caution';
   } else {
     overallRiskLevel = 'safe';
@@ -279,7 +326,7 @@ export function scanEmailHeuristic(email: EmailMessage): EmailScanReport {
   return {
     overallRiskLevel,
     overallScore,
-    isExternal: email.isExternal,
+    isExternal: effectiveIsExternal,
     heuristicSignals,
     links: extractedLinks,
     attachments: analyzedAttachments,

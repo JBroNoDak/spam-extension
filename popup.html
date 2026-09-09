@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Gmail Phishing Guard</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    body {
+      width: 340px;
+      padding: 16px;
+      background: #0f172a;
+      color: #f8fafc;
+      font-size: 13px;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 14px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #1e293b;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #38bdf8;
+    }
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #064e3b;
+      color: #34d399;
+    }
+    .status-badge.disabled {
+      background: #450a0a;
+      color: #f87171;
+    }
+    .card {
+      background: #1e293b;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 12px;
+      border: 1px solid #334155;
+    }
+    .card-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #94a3b8;
+      margin-bottom: 8px;
+      font-weight: 600;
+    }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 38px;
+      height: 20px;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+      background-color: #475569; transition: .3s; border-radius: 20px;
+    }
+    .slider:before {
+      position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px;
+      background-color: white; transition: .3s; border-radius: 50%;
+    }
+    input:checked + .slider { background-color: #0284c7; }
+    input:checked + .slider:before { transform: translateX(18px); }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .stat-item {
+      background: #0f172a;
+      padding: 8px 10px;
+      border-radius: 6px;
+      border: 1px solid #334155;
+    }
+    .stat-num {
+      font-size: 16px;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    .stat-lbl {
+      font-size: 10px;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    .legend-row {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      font-size: 11px;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+    .dot-red { background: #ef4444; }
+    .dot-amber { background: #f59e0b; }
+    .dot-yellow { background: #eab308; }
+    .dot-green { background: #22c55e; }
+
+    .input-group {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    input[type="text"] {
+      flex: 1;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #f8fafc;
+      padding: 6px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+    }
+    button {
+      background: #0284c7;
+      color: white;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #0369a1; }
+    .footer {
+      text-align: center;
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 8px;
+    }
+  </style>
+<script src="/_aistudio-iframe.js?v=2f1c016a"></script></head>
+<body>
+  <div class="header">
+    <div class="brand">
+      🛡️ <span>Gmail Phishing Guard</span>
+    </div>
+    <div id="statusBadge" class="status-badge">
+      ● ACTIVE
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="toggle-row">
+      <div>
+        <div style="font-weight: 600; font-size: 12px;">Real-Time Scanning</div>
+        <div style="font-size: 10px; color: #94a3b8;">Inspect links & attachments on Gmail</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggleScanning" checked>
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Threat Detection Stats</div>
+    <div class="stats-grid">
+      <div class="stat-item">
+        <div class="stat-num" id="emailsScanned">28</div>
+        <div class="stat-lbl">Emails Scanned</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="threatsBlocked" style="color: #f87171;">4</div>
+        <div class="stat-lbl">Phishing Blocked</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="linksInspected">73</div>
+        <div class="stat-lbl">Links Checked</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-num" id="attachmentsFlagged" style="color: #fbbf24;">3</div>
+        <div class="stat-lbl">Risky Files Flagged</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Warning System Matrix</div>
+    <div class="legend-row">
+      <div class="legend-item"><span class="dot dot-red"></span> <strong>Critical (Red):</strong> Spoofed URL, Lookalike, .exe/.scr payload</div>
+      <div class="legend-item"><span class="dot dot-amber"></span> <strong>Suspicious (Amber):</strong> Macro document, Shortener, Urgent lure</div>
+      <div class="legend-item"><span class="dot dot-yellow"></span> <strong>Caution (Yellow):</strong> External domain, HTTP unencrypted</div>
+      <div class="legend-item"><span class="dot dot-green"></span> <strong>Safe (Green):</strong> Verified sender, Clean reputation</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Trusted & Internal Domains (Whitelist)</div>
+    <div style="font-size: 10px; color: #94a3b8; margin-bottom: 6px; line-height: 1.4;">
+      Emails & links matching these domains will be treated as <strong>Internal / Verified Safe</strong> and will NOT be flagged as external.
+    </div>
+    <div class="input-group">
+      <input type="text" id="whitelistInput" placeholder="e.g. rks.io or partner.com">
+      <button id="addWhitelistBtn">+ Add</button>
+    </div>
+    <div id="whitelistTags" style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">
+      <!-- Populated dynamically -->
+    </div>
+    <div style="margin-top: 10px; display: flex; align-items: center; justify-content: space-between;">
+      <button id="rescanGmailBtn" style="background: #0284c7; width: 100%; padding: 8px; font-weight: 700; border-radius: 6px;">
+        🔄 Apply Whitelist & Rescan Gmail
+      </button>
+    </div>
+    <div id="rescanFeedback" style="font-size: 10px; color: #34d399; margin-top: 4px; text-align: center; display: none;">
+      ✓ Updated! Rescanning open Gmail tabs...
+    </div>
+  </div>
+
+  <div class="card" style="background: #1e293b; border-color: #3b82f640;">
+    <div class="card-title" style="color: #60a5fa; display: flex; align-items: center; justify-content: space-between;">
+      <span>How to Reload Extension</span>
+      <span style="font-size: 10px; text-transform: none; color: #94a3b8;">After code updates</span>
+    </div>
+    <div style="font-size: 11px; color: #cbd5e1; line-height: 1.5;">
+      <ol style="margin: 0; padding-left: 16px;">
+        <li>Open Chrome tab: <code style="background: #0f172a; padding: 1px 4px; border-radius: 3px; color: #38bdf8;">chrome://extensions</code></li>
+        <li>Enable <strong>Developer mode</strong> (toggle in top-right)</li>
+        <li>Click <strong>🔄 Reload</strong> on <em>Gmail Phishing Guard</em></li>
+        <li>Switch to Gmail and press <strong>Ctrl+R</strong> (or <strong>Cmd+R</strong>)</li>
+      </ol>
+    </div>
+  </div>
+
+  <div class="footer">
+    Manifest V3 • Protecting Gmail Web Client
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
